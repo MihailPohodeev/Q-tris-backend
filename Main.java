@@ -7,7 +7,7 @@ public class Main
 {
 	public static ServerSocket server;
 	public static int port = 18881;
-	public static List<Socket> clients = new ArrayList<Socket>();
+	public static List<User> clients = new ArrayList<User>();
 	private static void waitConnection()
 	{
 		try
@@ -15,7 +15,8 @@ public class Main
 			while(true)
 			{
 				Socket client = server.accept();
-				clients.add(client);
+				System.out.println(client.getInetAddress());
+				clients.add(new User(client));
 			}
 		}
 		catch (IOException e)
@@ -34,9 +35,10 @@ public class Main
 
 			while(true)
 			{
-				for (Socket client : clients)
+				System.out.println(clients.size());
+				for (User client : clients)
 				{
-					OutputStream out = client.getOutputStream();
+					OutputStream out = client.getSocket().getOutputStream();
 					String message = "Get!";
 					byte [] asciiBytes = message.getBytes(StandardCharsets.US_ASCII);
 					out.write(asciiBytes);
