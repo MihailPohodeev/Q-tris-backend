@@ -2,10 +2,12 @@
 #include <cstring>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <thread>
 #include <list>
+#include <mutex>
 
 #include "json.hpp"
 #include "Room.hxx"
@@ -26,6 +28,9 @@ std::list<User> unidentifiedUsers;
 std::list<User> users;
 std::list<Room> rooms;
 char buffer[BUFFER_SIZE] = {0};
+unsigned int roomIDGenerator = 1;
+
+std::mutex unidentifiedUsersGuard;
 
 using json = nlohmann::json;
 
@@ -82,10 +87,14 @@ int main()
 
 void listening_new_connections()
 {
+	std::cout << "listen new connections.\n";
 	while(1)
 	{
-		int newSocket;
-		if ((newSocket = accept(serverSocket, nullptr, nullptr)) < 0)
+		sockaddr_in client_addr{};
+		socklen_t client_addr_len = sizeof(client_addr);
+		int clientSocket = accept(serverSocket, \
+				(struct sockaddr*)&client_addr, &client_addr_len);
+		if (clientSocket < 0)
 		{
 			if (errno == EWOULDBLOCK || errno == EAGAIN)
 				continue;
@@ -94,32 +103,58 @@ void listening_new_connections()
 		}
 		else
 		{
+			int flags = fcntl(clientSocket, F_GETFL, 0);
+			if (flags == -1) {
+				std::cerr << "Failed to get client socket flags: " << strerror(errno) << std::endl;
+				close(clientSocket);
+				continue;
+			}
+			if (fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK) == -1) {
+				std::cerr << "Failed to set client socket to non-blocking: " << strerror(errno) << std::endl;
+				close(clientSocket);
+				continue;
+			}
+
+			int flag = 1;
+			if (setsockopt(clientSocket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag)) < 0) {
+				std::cerr << "Error disabling Nagle's algorithm: " << \
+					strerror(errno) << std::endl;
+				close(clientSocket);
+				continue;
+			}
+
 			std::cout << "successful connection!\n";
-			unidentifiedUsers.push_back(User(newSocket, ""));
+			std::lock_guard<std::mutex> lock(unidentifiedUsersGuard);
+			unidentifiedUsers.push_back(User(clientSocket, ""));
 		}
 	}
 }
 
 void handle_new_users()
 {
+	std::cout << "begin handle new users.\n";
 	while(1)
 	{
-		for(std::list<User>::iterator it = unidentifiedUsers.begin(); \
-				it != unidentifiedUsers.end();)
 		{
-			if (it->try_identify())
+			std::lock_guard<std::mutex> lock(unidentifiedUsersGuard);
+			for(std::list<User>::iterator it = unidentifiedUsers.begin(); \
+					it != unidentifiedUsers.end();)
 			{
-				users.push_back(*it);
-				it = unidentifiedUsers.erase(it);
+				if (it->try_identify())
+				{
+					users.push_back(*it);
+					it = unidentifiedUsers.erase(it);
+				}
+				else
+					++it;
 			}
-			else
-				++it;
 		}
 		for(std::list<User>::iterator it = users.begin(); it != users.end(); ++it)
 		{
-			char* data = it->get_information();
-			if (data == nullptr)
+			std::string data = it->dequeue_request();
+			if (data == "")
 				continue;
+			std::cout << "DATA : " << data << '\n';
 			json responceJSON;
 			try
 			{
@@ -127,33 +162,33 @@ void handle_new_users()
 				std::string command = responceJSON["Command"];
 				if (command == "CreateRoom")
 				{
-
+					std::cout << "POVEZLO-POVEZLO!\n";
 				}
 				else if (command == "ConnectToRoom")
 				{
-
+					// TODO.
 				}
 			}
 			catch(const json::parse_error& e)
 			{
-				std::cerr << "Parse error at byte : " << e.byte << " : " \
+				std::cerr << "User : "<< it->get_username() << " exception ; Parse error at byte : " << e.byte << " : " \
 					<< e.what() << '\n';
 			}
 			catch (const json::type_error& e)
 			{
-				std::cerr << "Type error : " << e.what() << '\n';
+				std::cerr << "User : "<< it->get_username() << " exception ; Type error : " << e.what() << '\n';
 			}
 			catch (const json::out_of_range& e)
 			{
-				std::cerr << "Out of range error : " << e.what() << '\n';
+				std::cerr << "User : "<< it->get_username() << " exception ; Out of range error : " << e.what() << '\n';
 			}
-			delete data;
 		}
 	}
 }
 
 void handle_game_processes()
 {
+	std::cout << "Handle rooms!\n";
 	while(1)
 	{
 		for(std::list<Room>::iterator it = rooms.begin(); it != rooms.end(); ++it)

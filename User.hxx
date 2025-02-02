@@ -2,12 +2,16 @@
 #define _USER_HXX_
 
 #include <string>
+#include <queue>
 
 class User
 {
 	int _socket;
 	std::string _username;
+	std::queue<std::string> _requestQueue;
 public:
+	// send information to user.
+	void send_information(const std::string&);
 	// receive information.
 	char* get_information();
 	// constructor.
@@ -19,6 +23,8 @@ public:
 	int get_socket() const;
 	// try to identify.
 	bool try_identify();
+	// dequeue request.
+	std::string dequeue_request();
 };
 
 #endif
