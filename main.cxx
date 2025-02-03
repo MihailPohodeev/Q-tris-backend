@@ -7,11 +7,13 @@
 #include <fcntl.h>
 #include <thread>
 #include <list>
+#include <unordered_map>
 #include <mutex>
 
 #include "json.hpp"
 #include "Room.hxx"
 #include "User.hxx"
+#include "functions.hxx"
 
 #define PORT 18881
 #define BUFFER_SIZE 2048
@@ -26,11 +28,14 @@ struct sockaddr_in address;
 int addrlen;
 std::list<User> unidentifiedUsers;
 std::list<User> users;
-std::list<Room> rooms;
+std::unordered_map<int, Room*> waitingRooms;
+std::unordered_map<int, Room*> processedRooms;
 char buffer[BUFFER_SIZE] = {0};
-unsigned int roomIDGenerator = 1;
+
+int roomIDGenerator = 1;
 
 std::mutex unidentifiedUsersGuard;
+std::mutex waitingRoomsGuard;
 
 using json = nlohmann::json;
 
@@ -149,20 +154,32 @@ void handle_new_users()
 					++it;
 			}
 		}
-		for(std::list<User>::iterator it = users.begin(); it != users.end(); ++it)
+		for(std::list<User>::iterator it = users.begin(); it != users.end(); )
 		{
 			std::string data = it->dequeue_request();
 			if (data == "")
+			{
+				++it;
 				continue;
+			}
 			std::cout << "DATA : " << data << '\n';
-			json responceJSON;
+			json responseJSON;
 			try
 			{
-				responceJSON = json::parse(data);
-				std::string command = responceJSON["Command"];
+				responseJSON = json::parse(data);
+				std::string command = responseJSON["Command"];
 				if (command == "CreateRoom")
 				{
-					std::cout << "POVEZLO-POVEZLO!\n";
+					GameParameter gp = {responseJSON["Parameters"]["PlayersCount"], responseJSON["Parameters"]["StartLevel"], (std::string)responseJSON["Parameters"]["QueueType"] == std::string("Same") ? true : false};
+					{
+						std::lock_guard<std::mutex> lock(waitingRoomsGuard);
+						int roomID = create_room(gp);
+						Room* room = waitingRooms[roomID];
+						bool insertUser = add_user_to_room(room, *it);
+					}
+					it = users.erase(it);
+					std::cout << "Successful created room!\n";
+					continue;
 				}
 				else if (command == "ConnectToRoom")
 				{
@@ -182,6 +199,7 @@ void handle_new_users()
 			{
 				std::cerr << "User : "<< it->get_username() << " exception ; Out of range error : " << e.what() << '\n';
 			}
+			++it;
 		}
 	}
 }
@@ -191,9 +209,17 @@ void handle_game_processes()
 	std::cout << "Handle rooms!\n";
 	while(1)
 	{
-		for(std::list<Room>::iterator it = rooms.begin(); it != rooms.end(); ++it)
 		{
-			std::cout << "It's room!";
+			std::lock_guard<std::mutex> lock(waitingRoomsGuard);
+			for (const auto& pair : waitingRooms)
+			{
+				pair.second->handle_waiting_room();
+			}
+		}
+
+		for (const auto& pair : processedRooms)
+		{
+			// TODO.
 		}
 	}
 }

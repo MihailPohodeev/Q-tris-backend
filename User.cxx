@@ -5,10 +5,13 @@
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <poll.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <vector>
 
 using json = nlohmann::json;
+
 
 std::vector<std::string> splitJson(const std::string&);
 
@@ -42,8 +45,9 @@ bool User::try_identify()
 				_username = responceJSON["Username"];
 			}
 			json response;
-			response["Command"] = "Responce";
-			response["Status"] = "Successful";
+			response["Command"] = "Acception";
+			response["Status"] = "Successful"; // or Failure.
+			response["UserID"] = _socket;
 			
 			std::cout << "RESP : " << response.dump() << '\n';
 			send_information(response.dump());
@@ -67,8 +71,8 @@ bool User::try_identify()
 
 std::string User::dequeue_request()
 {
-	char* data = get_information();
-	if (data != nullptr)
+	std::string data = get_information();
+	if (data != "")
 	{
 		std::vector<std::string> vec = splitJson(data);
 		for (auto& x : vec)
@@ -76,11 +80,10 @@ std::string User::dequeue_request()
 			std::cout << "ELEMENT : " << x << '\n';
 			_requestQueue.push(x);
 		}
-		delete data;
 	}
 	if (_requestQueue.size() == 0)
 		return "";
-	else std::cout << "REQUEST_QUQUE size : " << _requestQueue.size() << '\n';
+	else std::cout << "REQUEST_QUEUE size : " << _requestQueue.size() << '\n';
 	std::string result = _requestQueue.front();
 	_requestQueue.pop();
 	return result;
@@ -105,35 +108,124 @@ void User::send_information(const std::string& str)
         }
 }
 
-char* User::get_information()
+std::string User::get_information()
 {
-	std::vector<char> receivedData;
-	receivedData.assign(1024, 0);
-	int currentPosition = 0;
-	int bytesRead = 0;
-	do
-	{
-		bytesRead = recv(_socket, &receivedData[0] + currentPosition, \
-				receivedData.size() - currentPosition, 0);
-		//if ((float)receivedData.size() / receivedData.capacity() > 0.6)
-		currentPosition += bytesRead;
-	} while(bytesRead > 0);
-	if (bytesRead < 0)
+	size_t sizeOfBuffer = 2048;
+	char* buffer = new char[sizeOfBuffer];
+	int receivedBytes;
+	
+	receivedBytes = recv(_socket, buffer, sizeOfBuffer - 1, 0);
+
+	if (receivedBytes < 0)
 	{
 		if (errno != EWOULDBLOCK && errno != EAGAIN)
 		{
-			std::cerr << "recv failed";
+			std::cerr << "recv failed: " << strerror(errno) << std::endl;
+			delete buffer;
+			return "";
+		}
+		delete buffer;
+		return "";
+	}
+	else if (receivedBytes == 0)
+	{
+		std::cerr << "Server is unavailable.\n";
+	}
+
+	buffer[receivedBytes] = 0;
+	std::cout << "received bytes : " << receivedBytes << " ; ReCeIvEd : " << buffer << '\n';
+	if (receivedBytes == 0)
+	{
+		delete buffer;
+		return "";
+	}
+	std::string result(buffer);
+	delete buffer;
+	return result;
+}
+
+// make ready.
+void User::make_ready()
+{
+	_isReady = true;
+}
+
+// make non-ready.
+void User::make_non_ready()
+{
+	_isReady = false;
+}
+
+// is user ready?
+bool User::is_ready() const
+{
+	return _isReady;
+}
+
+U64 User::get_score() const
+{
+	return _score;
+}
+
+void User::set_score(U64 score)
+{
+	_score = score;
+}
+
+U32 User::get_lines() const
+{
+	return _lines;
+}
+
+void User::set_lines(U32 lines)
+{
+	_lines = lines;
+}
+
+U32 User::get_level() const
+{
+	return _level;
+}
+
+void User::set_level(U32 level)
+{
+	_level = level;
+}
+
+// is socket valid
+bool User::is_socket_valid() const
+{
+	struct pollfd pfd;
+	pfd.fd = _socket;
+	pfd.events = POLLIN;
+
+	int ret = poll(&pfd, 1, 0);
+	if (ret == -1)
+	{
+		std::cerr << "Error poll: " << strerror(errno) << std::endl;
+		return true;
+	}
+
+	if (ret > 0 && (pfd.revents & POLLIN))
+	{
+		char buffer[1];
+		ssize_t bytesReceived = recv(_socket, buffer, sizeof(buffer), MSG_PEEK);
+		if (bytesReceived == 0) {
+			return false;
 		}
 	}
-	if (currentPosition > 0)
-	{
-		receivedData[currentPosition] = 0;
-		char* result = new char[currentPosition + 1];
-		strncpy(result, &receivedData[0], currentPosition + 1);
-		std::cout << "RECEIVED : " << result << '\n';
-		return result;
-	}
-	return nullptr;
+	return true;
+}
+
+// is user connected?
+bool User::is_user_connected() const
+{
+	return is_socket_valid();
+}
+
+void User::close_socket()
+{
+	close(_socket);
 }
 
 std::vector<std::string> splitJson(const std::string& input) {
