@@ -35,6 +35,7 @@ char buffer[BUFFER_SIZE] = {0};
 int roomIDGenerator = 1;
 
 std::mutex unidentifiedUsersGuard;
+std::mutex usersGuard;
 std::mutex waitingRoomsGuard;
 
 using json = nlohmann::json;
@@ -95,6 +96,7 @@ void listening_new_connections()
 	std::cout << "listen new connections.\n";
 	while(1)
 	{
+		//std::cout << "listening new connections.\n";
 		sockaddr_in client_addr{};
 		socklen_t client_addr_len = sizeof(client_addr);
 		int clientSocket = accept(serverSocket, \
@@ -140,11 +142,20 @@ void handle_new_users()
 	std::cout << "begin handle new users.\n";
 	while(1)
 	{
+		//std::cout << "handle new users.\n";
 		{
 			std::lock_guard<std::mutex> lock(unidentifiedUsersGuard);
 			for(std::list<User>::iterator it = unidentifiedUsers.begin(); \
 					it != unidentifiedUsers.end();)
 			{
+				if( !it->is_user_connected() )
+				{
+					std::cout << "LIQUIDIROVAN!\n";
+					it->close_socket();
+					it = unidentifiedUsers.erase(it);
+					continue;
+				}
+
 				if (it->try_identify())
 				{
 					users.push_back(*it);
@@ -156,6 +167,15 @@ void handle_new_users()
 		}
 		for(std::list<User>::iterator it = users.begin(); it != users.end(); )
 		{
+			std::cout << "handled user : " << it->get_username() << '\n';
+			if( !it->is_user_connected() )
+			{
+				std::cout << "LIQUIDIROVAN!\n";
+				it->close_socket();
+				it = users.erase(it);
+				continue;
+			}
+
 			std::string data = it->dequeue_request();
 			if (data == "")
 			{
@@ -171,11 +191,24 @@ void handle_new_users()
 				if (command == "CreateRoom")
 				{
 					GameParameter gp = {responseJSON["Parameters"]["PlayersCount"], responseJSON["Parameters"]["StartLevel"], (std::string)responseJSON["Parameters"]["QueueType"] == std::string("Same") ? true : false};
+					json response;
+					response["Command"] = "RoomCreationResponse";
 					{
+						std::cout << "before mutex locking.\n";
 						std::lock_guard<std::mutex> lock(waitingRoomsGuard);
+						std::cout << "after mutex locking.\n";
 						int roomID = create_room(gp);
+						if (roomID == 0)
+						{
+							response["Status"] = "Fail";
+							it->send_information(response.dump());
+							continue;
+						}
 						Room* room = waitingRooms[roomID];
 						bool insertUser = add_user_to_room(room, *it);
+						response["Status"] = "Successful";
+						response["RoomID"] = roomID;
+						it->send_information(response.dump());
 					}
 					it = users.erase(it);
 					std::cout << "Successful created room!\n";
@@ -183,7 +216,19 @@ void handle_new_users()
 				}
 				else if (command == "ConnectToRoom")
 				{
-					// TODO.
+					std::lock_guard<std::mutex> lock(waitingRoomsGuard);
+					Room* room = waitingRooms[responseJSON["Parameters"]["RoomID"]];
+					json response;
+					response["Command"] = "RoomConnectionResponse";
+					if (add_user_to_room(room, *it))
+					{
+						response["Status"] = "Successful";
+						it->send_information(response.dump());
+						it = users.erase(it);
+						continue;
+					}
+					response["Status"] = "Fail";
+					it->send_information(response.dump());
 				}
 			}
 			catch(const json::parse_error& e)
@@ -209,6 +254,7 @@ void handle_game_processes()
 	std::cout << "Handle rooms!\n";
 	while(1)
 	{
+		//std::cout << "handle rooms!\n";
 		{
 			std::lock_guard<std::mutex> lock(waitingRoomsGuard);
 			for (const auto& pair : waitingRooms)

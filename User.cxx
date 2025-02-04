@@ -91,10 +91,10 @@ std::string User::dequeue_request()
 
 void User::send_information(const std::string& str)
 {
-	int totalSent = 0;
+	size_t totalSent = 0;
         while (totalSent < str.size())
         {
-                int bytesSent = send(_socket, str.c_str(), str.size() + 1, 0);
+                int bytesSent = send(_socket, str.c_str() + totalSent, str.size() - totalSent + 1, 0);
                 if (bytesSent < 0) {
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
                                 std::cout << "Send would block, try again later." << std::endl;
@@ -121,26 +121,27 @@ std::string User::get_information()
 		if (errno != EWOULDBLOCK && errno != EAGAIN)
 		{
 			std::cerr << "recv failed: " << strerror(errno) << std::endl;
-			delete buffer;
+			delete [] buffer;
 			return "";
 		}
-		delete buffer;
+		delete [] buffer;
 		return "";
 	}
 	else if (receivedBytes == 0)
 	{
 		std::cerr << "Server is unavailable.\n";
+		delete [] buffer;
+		return "";
 	}
 
 	buffer[receivedBytes] = 0;
-	std::cout << "received bytes : " << receivedBytes << " ; ReCeIvEd : " << buffer << '\n';
 	if (receivedBytes == 0)
 	{
-		delete buffer;
+		delete [] buffer;
 		return "";
 	}
 	std::string result(buffer);
-	delete buffer;
+	delete [] buffer;
 	return result;
 }
 

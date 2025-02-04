@@ -2,12 +2,14 @@
 #define _ROOM_HXX_
 
 #include <list>
+#include <mutex>
 
 #include "GameParameter.hxx"
 #include "User.hxx"
 
 class Room
 {
+	mutable std::mutex _usersListGuard;
 	// is room play of wait?
 	bool _isPlay;
 	// room's id.

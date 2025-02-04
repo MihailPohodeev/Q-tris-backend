@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall
+CXXFLAGS = -Wall -g
 SRC = $(wildcard *.cxx)
 OBJ = $(SRC:.cxx=.o)
 TARGET = program

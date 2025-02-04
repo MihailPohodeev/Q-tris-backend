@@ -10,6 +10,7 @@ Room::Room(int id, const GameParameter& gameParameter) : _ID(id), _gameParameter
 // add user to room.
 void Room::add_user(const User& user)
 {
+	std::lock_guard<std::mutex> lock(_usersListGuard);
 	_users.push_back(user);
 }
 
@@ -21,6 +22,7 @@ int Room::get_ID() const
 // get count of user.
 int Room::get_players_count() const
 {
+	std::lock_guard<std::mutex> lock(_usersListGuard);
 	return _users.size();
 }
 
@@ -33,6 +35,7 @@ int Room::get_players_capacity() const
 // start the game.
 bool Room::start_game()
 {
+	std::lock_guard<std::mutex> lock(_usersListGuard);
 	if (_users.size() < _gameParameter.playersCount)
 		return false;
 	return true;
@@ -42,6 +45,7 @@ bool Room::start_game()
 void Room::handle_waiting_room()
 {
 	bool roomIsReady = true;
+	std::lock_guard<std::mutex> lock(_usersListGuard);
 	if (_users.size() < _gameParameter.playersCount)
 		roomIsReady = false;
 	for (std::list<User>::iterator it = _users.begin(); it != _users.end();)
@@ -56,7 +60,10 @@ void Room::handle_waiting_room()
 		}
 		std::string request = it->dequeue_request();
 		if (request == "")
+		{
+			++it;
 			continue;
+		}
 		std::cout << "User : " << it->get_username() << " - request : " << request << '\n';	
 		json requestJSON;
 		try
