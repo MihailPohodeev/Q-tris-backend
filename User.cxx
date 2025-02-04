@@ -110,6 +110,7 @@ void User::send_information(const std::string& str)
 
 std::string User::get_information()
 {
+	//std::cout << "begining getting information.\n";
 	size_t sizeOfBuffer = 2048;
 	char* buffer = new char[sizeOfBuffer];
 	int receivedBytes;
@@ -122,15 +123,18 @@ std::string User::get_information()
 		{
 			std::cerr << "recv failed: " << strerror(errno) << std::endl;
 			delete [] buffer;
+			//std::cout << "ending getting information.\n";
 			return "";
 		}
 		delete [] buffer;
+		//std::cout << "ending getting information.\n";
 		return "";
 	}
 	else if (receivedBytes == 0)
 	{
 		std::cerr << "Server is unavailable.\n";
 		delete [] buffer;
+		//std::cout << "ending getting information.\n";
 		return "";
 	}
 
@@ -138,10 +142,12 @@ std::string User::get_information()
 	if (receivedBytes == 0)
 	{
 		delete [] buffer;
+		//std::cout << "ending getting information.\n";
 		return "";
 	}
 	std::string result(buffer);
 	delete [] buffer;
+	//std::cout << "ending getting information.\n";
 	return result;
 }
 

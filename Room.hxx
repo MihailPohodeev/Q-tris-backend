@@ -10,6 +10,7 @@
 class Room
 {
 	mutable std::mutex _usersListGuard;
+	bool _isReady;
 	// is room play of wait?
 	bool _isPlay;
 	// room's id.
@@ -30,10 +31,15 @@ public:
 	int get_players_count() const;
 	// get capacity of room.
 	int get_players_capacity() const;
+	// is game can start?
+	bool is_start_game() const;
 	// start game.
-	bool start_game();
-	// handle.
+	void notify_users_about_game_start();
+
+	// handle waiting room.
 	void handle_waiting_room();
+	// handle process of game
+	void handle_process_room();
 };
 
 #endif

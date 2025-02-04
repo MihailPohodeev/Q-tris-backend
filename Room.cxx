@@ -5,7 +5,7 @@
 
 using json = nlohmann::json;
 
-Room::Room(int id, const GameParameter& gameParameter) : _ID(id), _gameParameter(gameParameter), _isPlay(false) {}
+Room::Room(int id, const GameParameter& gameParameter) : _ID(id), _gameParameter(gameParameter), _isPlay(false), _isReady(false) {}
 
 // add user to room.
 void Room::add_user(const User& user)
@@ -32,13 +32,22 @@ int Room::get_players_capacity() const
 	return _gameParameter.playersCount;
 }
 
-// start the game.
-bool Room::start_game()
+// is game can start?
+bool Room::is_start_game() const
 {
-	std::lock_guard<std::mutex> lock(_usersListGuard);
-	if (_users.size() < _gameParameter.playersCount)
-		return false;
-	return true;
+	return _isReady;
+}
+
+// start the game.
+void Room::notify_users_about_game_start()
+{
+	json notification;
+	notification["Command"] = "CanStartGame";
+	std::string result = notification.dump();
+	for (auto it = _users.begin(); it != _users.end(); ++it)
+	{
+		it->send_information(result);
+	}
 }
 
 // handle waiting room.
@@ -97,6 +106,7 @@ void Room::handle_waiting_room()
 			roomIsReady = false;
 		++it;
 	}
-	if (roomIsReady)
-		std::cout << "Room is ready!!!\n";
+	_isReady = roomIsReady;
 }
+
+

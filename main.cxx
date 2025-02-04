@@ -35,7 +35,6 @@ char buffer[BUFFER_SIZE] = {0};
 int roomIDGenerator = 1;
 
 std::mutex unidentifiedUsersGuard;
-std::mutex usersGuard;
 std::mutex waitingRoomsGuard;
 
 using json = nlohmann::json;
@@ -167,7 +166,7 @@ void handle_new_users()
 		}
 		for(std::list<User>::iterator it = users.begin(); it != users.end(); )
 		{
-			std::cout << "handled user : " << it->get_username() << '\n';
+			//std::cout << "cycle.\n";
 			if( !it->is_user_connected() )
 			{
 				std::cout << "LIQUIDIROVAN!\n";
@@ -217,15 +216,19 @@ void handle_new_users()
 				else if (command == "ConnectToRoom")
 				{
 					std::lock_guard<std::mutex> lock(waitingRoomsGuard);
-					Room* room = waitingRooms[responseJSON["Parameters"]["RoomID"]];
+					int roomID = responseJSON["Parameters"]["RoomID"];
+					auto roomIT = waitingRooms.find(roomID);
 					json response;
 					response["Command"] = "RoomConnectionResponse";
-					if (add_user_to_room(room, *it))
+					if (roomIT != waitingRooms.end())
 					{
-						response["Status"] = "Successful";
-						it->send_information(response.dump());
-						it = users.erase(it);
-						continue;
+						if (add_user_to_room(roomIT->second, *it))
+						{
+							response["Status"] = "Successful";
+							it->send_information(response.dump());
+							it = users.erase(it);
+							continue;
+						}
 					}
 					response["Status"] = "Fail";
 					it->send_information(response.dump());
@@ -245,6 +248,7 @@ void handle_new_users()
 				std::cerr << "User : "<< it->get_username() << " exception ; Out of range error : " << e.what() << '\n';
 			}
 			++it;
+			//std::cout << "end cycle.\n";
 		}
 	}
 }
@@ -257,15 +261,27 @@ void handle_game_processes()
 		//std::cout << "handle rooms!\n";
 		{
 			std::lock_guard<std::mutex> lock(waitingRoomsGuard);
-			for (const auto& pair : waitingRooms)
+			for (auto it = waitingRooms.begin(); it != waitingRooms.end();)
 			{
-				pair.second->handle_waiting_room();
+				if (it->second)
+				{
+					it->second->handle_waiting_room();
+					if (it->second->is_start_game())
+					{
+						processedRooms.insert({it->first, it->second});
+						it->second->notify_users_about_game_start();
+						it = waitingRooms.erase(it);
+						continue;
+					}
+				}
+				++it;
 			}
 		}
 
-		for (const auto& pair : processedRooms)
+		for (auto it = processedRooms.begin(); it != processedRooms.end();)
 		{
-			// TODO.
+			//std::cout << "processed.\n";
+			++it;
 		}
 	}
 }
