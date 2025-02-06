@@ -280,7 +280,12 @@ void handle_game_processes()
 
 		for (auto it = processedRooms.begin(); it != processedRooms.end();)
 		{
-			//std::cout << "processed.\n";
+			if (!it->second)
+			{
+				++it;
+				continue;
+			}
+			it->second->handle_process_room();
 			++it;
 		}
 	}

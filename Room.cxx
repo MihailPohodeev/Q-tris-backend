@@ -109,4 +109,63 @@ void Room::handle_waiting_room()
 	_isReady = roomIsReady;
 }
 
+// handle process room.
+void Room::handle_process_room()
+{
+	for (auto it = _users.begin(); it != _users.end(); ++it)
+	{
+		if( !it->is_user_connected() )
+		{
+			std::cout << "LIQUIDIROVAN!\n";
+			it->close_socket();
+			it = _users.erase(it);
+			--it;
+			continue;
+		}
+		std::string request = it->dequeue_request();
+		if (request == "")
+			continue;
+		
+		json requestJSON;
+		try
+		{
+			requestJSON = json::parse(request);
+			std::string command = requestJSON["Command"];
+			if (command == "GetRoomParameters")
+			{
+				json response;
+				response["Command"] = "RoomParameters";
+				response["Users"] = json::array();
+				for (auto jt = _users.begin(); jt != _users.end(); ++jt)
+				{
+					if (it == jt)
+						continue;
+					json userData;
+					userData["ID"] = jt->get_socket();
+					userData["Username"] = jt->get_username();
+					response["Users"].push_back(userData);
+					it->send_information(response.dump());
+				}
+			}
+			else if (command == "GameFrame")
+			{
+				std::cout << request << '\n';
+			}
+		}
+		catch(const json::parse_error& e)
+		{
+			std::cerr << "Can't handle user in process ; Parse error at byte : " << e.byte << " : " << e.what() << '\n';
+		}
+		catch (const json::type_error& e)
+		{
+			std::cerr << "Can't handle user in process ; Type error : " << e.what() << '\n';
+		}
+		catch (const json::out_of_range& e)
+		{
+			std::cerr << "Can't handle user in process ; Out of range error : " << e.what() << '\n';
+		}
+	}
+}
+
+
 
