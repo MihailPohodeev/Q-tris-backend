@@ -112,6 +112,10 @@ void Room::handle_waiting_room()
 // handle process room.
 void Room::handle_process_room()
 {
+	json dataFrame;
+	dataFrame["Command"] = "DataFrame";
+	dataFrame["Data"] = json::array();
+
 	for (auto it = _users.begin(); it != _users.end(); ++it)
 	{
 		if( !it->is_user_connected() )
@@ -122,6 +126,7 @@ void Room::handle_process_room()
 			--it;
 			continue;
 		}
+
 		std::string request = it->dequeue_request();
 		if (request == "")
 			continue;
@@ -149,7 +154,10 @@ void Room::handle_process_room()
 			}
 			else if (command == "GameFrame")
 			{
-				std::cout << request << '\n';
+				json data;
+				data["UserID"] = it->get_socket();
+				data["Data"] = requestJSON["Data"];
+				dataFrame["Data"].push_back(data);
 			}
 		}
 		catch(const json::parse_error& e)
@@ -164,6 +172,12 @@ void Room::handle_process_room()
 		{
 			std::cerr << "Can't handle user in process ; Out of range error : " << e.what() << '\n';
 		}
+	}
+
+	for (auto it = _users.begin(); it != _users.end(); ++it)
+	{
+		std::cout << "Data : " << dataFrame.dump() << '\n';;
+		it->send_information(dataFrame.dump());
 	}
 }
 

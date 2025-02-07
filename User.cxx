@@ -81,9 +81,10 @@ std::string User::dequeue_request()
 			_requestQueue.push(x);
 		}
 	}
+
 	if (_requestQueue.size() == 0)
 		return "";
-	else std::cout << "REQUEST_QUEUE size : " << _requestQueue.size() << '\n';
+
 	std::string result = _requestQueue.front();
 	_requestQueue.pop();
 	return result;
@@ -92,20 +93,21 @@ std::string User::dequeue_request()
 void User::send_information(const std::string& str)
 {
 	size_t totalSent = 0;
-        while (totalSent < str.size())
-        {
-                int bytesSent = send(_socket, str.c_str() + totalSent, str.size() - totalSent + 1, 0);
-                if (bytesSent < 0) {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                std::cout << "Send would block, try again later." << std::endl;
-                        } else {
-                                std::cerr << "Error sending data: " << strerror(errno) << std::endl;
-                        }
-                } else {
-                        totalSent += bytesSent;
-                        std::cout << "Sent " << bytesSent<<" bytes: " << str << std::endl;
-                }
-        }
+	while (totalSent < str.size())
+	{
+		int bytesSent = send(_socket, str.c_str() + totalSent, str.size() - totalSent + 1, 0);
+		if (bytesSent < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				std::cout << "Send would block, try again later." << std::endl;
+			}
+			else {
+				std::cerr << "Error sending data: " << strerror(errno) << std::endl;
+			}
+			break;
+		}
+		else
+			totalSent += bytesSent;
+	}
 }
 
 std::string User::get_information()
