@@ -46,6 +46,7 @@ void Room::notify_users_about_game_start()
 	std::string result = notification.dump();
 	for (auto it = _users.begin(); it != _users.end(); ++it)
 	{
+		std::cout << "notify : " << it->get_username() << '\n';
 		it->send_information(result);
 	}
 }
@@ -59,7 +60,7 @@ void Room::handle_waiting_room()
 		roomIsReady = false;
 	for (std::list<User>::iterator it = _users.begin(); it != _users.end();)
 	{
-		std::cout << "handle " << it->get_username() << " user.\n";
+		//std::cout << "handle " << it->get_username() << " user.\n";
 		if( !it->is_user_connected() )
 		{
 			std::cout << "LIQUIDIROVAN!\n";
@@ -162,21 +163,21 @@ void Room::handle_process_room()
 		}
 		catch(const json::parse_error& e)
 		{
-			std::cerr << "Can't handle user in process ; Parse error at byte : " << e.byte << " : " << e.what() << '\n';
+			std::cerr << "Can't handle user in process ; Parse error at byte : " << e.byte << " : " << e.what() << " ; String : " << request << '\n';
 		}
 		catch (const json::type_error& e)
 		{
-			std::cerr << "Can't handle user in process ; Type error : " << e.what() << '\n';
+			std::cerr << "Can't handle user in process ; Type error : " << e.what() << " ; String : " << request << '\n';
 		}
 		catch (const json::out_of_range& e)
 		{
-			std::cerr << "Can't handle user in process ; Out of range error : " << e.what() << '\n';
+			std::cerr << "Can't handle user in process ; Out of range error : " << e.what() << " ; String : " << request<< '\n';
 		}
 	}
 
 	for (auto it = _users.begin(); it != _users.end(); ++it)
 	{
-		std::cout << "Data : " << dataFrame.dump() << '\n';;
+		//std::cout << "Data : " << dataFrame.dump() << '\n';;
 		it->send_information(dataFrame.dump());
 	}
 }

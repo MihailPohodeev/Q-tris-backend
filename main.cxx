@@ -193,9 +193,7 @@ void handle_new_users()
 					json response;
 					response["Command"] = "RoomCreationResponse";
 					{
-						std::cout << "before mutex locking.\n";
 						std::lock_guard<std::mutex> lock(waitingRoomsGuard);
-						std::cout << "after mutex locking.\n";
 						int roomID = create_room(gp);
 						if (roomID == 0)
 						{

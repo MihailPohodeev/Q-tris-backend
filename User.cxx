@@ -74,12 +74,16 @@ std::string User::dequeue_request()
 	std::string data = get_information();
 	if (data != "")
 	{
+		std::cout << "Received : " << data << '\n';
+		/*
 		std::vector<std::string> vec = splitJson(data);
 		for (auto& x : vec)
 		{
-			std::cout << "ELEMENT : " << x << '\n';
+			//std::cout << "ELEMENT : " << x << '\n';
 			_requestQueue.push(x);
 		}
+		*/
+		_requestQueue.push(data);
 	}
 
 	if (_requestQueue.size() == 0)
@@ -92,6 +96,26 @@ std::string User::dequeue_request()
 
 void User::send_information(const std::string& str)
 {
+	struct pollfd fds[1];
+	fds[0].fd = _socket;
+	fds[0].events = POLLOUT;
+
+	int poll_count = poll(fds, 1, 100);
+	if (poll_count < 0) {
+		std::cerr << "Error in poll()" << std::endl;
+		return;
+	}
+	else if (poll_count == 0) {
+		std::cout << "Timeout, no activity" << std::endl;
+		return;
+	}
+
+	if (!(fds[0].revents & POLLOUT))
+	{
+		std::cerr << "Can't send data to user : " << _socket << '\n';
+	       return;
+	}
+	
 	size_t totalSent = 0;
 	while (totalSent < str.size())
 	{
@@ -112,31 +136,53 @@ void User::send_information(const std::string& str)
 
 std::string User::get_information()
 {
-	//std::cout << "begining getting information.\n";
 	size_t sizeOfBuffer = 2048;
 	char* buffer = new char[sizeOfBuffer];
-	int receivedBytes;
+	int receivedBytes = 0;
+
+	struct pollfd fds[1];
+	fds[0].fd = _socket;
+	fds[0].events = POLLIN;
+
+	int poll_count = poll(fds, 1, 100);
 	
-	receivedBytes = recv(_socket, buffer, sizeOfBuffer - 1, 0);
+	if (poll_count < 0) {
+            std::cerr << "Error in poll()\n";
+	    delete [] buffer;
+	    return "";
+        }
+	else if (poll_count == 0) {
+            delete [] buffer;
+	    return "";
+        }
+	
+	if (fds[0].revents && POLLIN)
+	{
+		receivedBytes = recv(_socket, buffer, sizeOfBuffer - 1, 0);
+	}
+	else
+	{
+		std::cerr << "Can't receive data from user : " << _socket << '\n';
+		delete [] buffer;
+		return "";
+	}
 
 	if (receivedBytes < 0)
 	{
+		std::cerr << "GOT < 0 data! User : " << _socket << '\n';
 		if (errno != EWOULDBLOCK && errno != EAGAIN)
 		{
 			std::cerr << "recv failed: " << strerror(errno) << std::endl;
 			delete [] buffer;
-			//std::cout << "ending getting information.\n";
 			return "";
 		}
 		delete [] buffer;
-		//std::cout << "ending getting information.\n";
 		return "";
 	}
 	else if (receivedBytes == 0)
 	{
-		std::cerr << "Server is unavailable.\n";
+		std::cerr << "Client is unavailable.\n";
 		delete [] buffer;
-		//std::cout << "ending getting information.\n";
 		return "";
 	}
 
@@ -144,12 +190,13 @@ std::string User::get_information()
 	if (receivedBytes == 0)
 	{
 		delete [] buffer;
-		//std::cout << "ending getting information.\n";
 		return "";
 	}
 	std::string result(buffer);
+	std::cout << "Received inside : " << buffer << "\n received Bytes : " << receivedBytes << '\n';
+	for (U32 i = 0; i < receivedBytes; i++)
+		std::cout << ((buffer[i] != 0) ? buffer[i] : 'z');
 	delete [] buffer;
-	//std::cout << "ending getting information.\n";
 	return result;
 }
 
