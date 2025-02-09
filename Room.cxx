@@ -171,7 +171,7 @@ void Room::handle_process_room()
 		}
 		catch (const json::out_of_range& e)
 		{
-			std::cerr << "Can't handle user in process ; Out of range error : " << e.what() << " ; String : " << request<< '\n';
+			std::cerr << "Can't handle user in process ; Out of range error : " << e.what() << " ; String : " << request << '\n';
 		}
 	}
 

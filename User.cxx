@@ -136,7 +136,7 @@ void User::send_information(const std::string& str)
 
 std::string User::get_information()
 {
-	size_t sizeOfBuffer = 2048;
+	size_t sizeOfBuffer = 16384;
 	char* buffer = new char[sizeOfBuffer];
 	int receivedBytes = 0;
 
@@ -193,9 +193,6 @@ std::string User::get_information()
 		return "";
 	}
 	std::string result(buffer);
-	std::cout << "Received inside : " << buffer << "\n received Bytes : " << receivedBytes << '\n';
-	for (U32 i = 0; i < receivedBytes; i++)
-		std::cout << ((buffer[i] != 0) ? buffer[i] : 'z');
 	delete [] buffer;
 	return result;
 }
