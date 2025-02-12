@@ -15,7 +15,33 @@ using json = nlohmann::json;
 
 std::vector<std::string> splitJson(const std::string&);
 
-User::User(int socket, const std::string& username) : _socket(socket), _username(username) {}
+User::User(int socket, const std::string& username) : _socket(socket), _username(username), _sizeOfBuffer(32000)
+{
+	size_t sizeOfBuffer = 16384;
+	_buffer = new char[sizeOfBuffer];
+}
+
+User::~User()
+{
+	delete [] _buffer;
+}
+
+// copy constructor.
+User::User(const User& usr) : _socket(usr._socket), _username(usr._username), _sizeOfBuffer(usr._sizeOfBuffer)
+{
+	_buffer = new char[_sizeOfBuffer];
+	memcpy(_buffer, usr._buffer, _sizeOfBuffer);
+}
+
+// operator=
+User User::operator=(User usr)
+{
+	char* temp = _buffer;
+	_buffer = usr._buffer;
+	usr._buffer = temp;
+	return *this;
+}
+
 
 std::string User::get_username() const
 {
@@ -71,19 +97,43 @@ bool User::try_identify()
 
 std::string User::dequeue_request()
 {
-	std::string data = get_information();
-	if (data != "")
+	static std::string lastWord = "";
+	size_t receivedBytes = get_information();
+
+	if (receivedBytes != 0)
 	{
-		std::cout << "Received : " << data << '\n';
-		/*
-		std::vector<std::string> vec = splitJson(data);
-		for (auto& x : vec)
+		auto begin = _buffer;
+		auto end   = _buffer + receivedBytes - 1;
+		do
 		{
-			//std::cout << "ELEMENT : " << x << '\n';
-			_requestQueue.push(x);
-		}
-		*/
-		_requestQueue.push(data);
+			auto it = std::find_if(begin, end, [](char x) { return x == '\0';});
+			if (lastWord != "")
+			{
+				lastWord += std::string(begin);
+				_requestQueue.push(lastWord);
+				lastWord = "";
+			}
+			if (it == end)
+			{
+				try
+				{
+					std::string result(begin);
+					json::parse(result);
+					_requestQueue.push(result);
+				}
+				catch (const json::parse_error& e)
+				{
+					lastWord = std::string(begin);
+				}
+				break;
+			}
+			else
+			{
+				std::cout << "str : " << std::string(begin);
+				_requestQueue.push(std::string(begin));
+				begin = it + 1;
+			}
+		} while(1);
 	}
 
 	if (_requestQueue.size() == 0)
@@ -134,10 +184,9 @@ void User::send_information(const std::string& str)
 	}
 }
 
-std::string User::get_information()
+// get information from socket and put it in _buffer.
+size_t User::get_information()
 {
-	size_t sizeOfBuffer = 16384;
-	char* buffer = new char[sizeOfBuffer];
 	int receivedBytes = 0;
 
 	struct pollfd fds[1];
@@ -148,23 +197,20 @@ std::string User::get_information()
 	
 	if (poll_count < 0) {
             std::cerr << "Error in poll()\n";
-	    delete [] buffer;
-	    return "";
+	    return 0;
         }
 	else if (poll_count == 0) {
-            delete [] buffer;
-	    return "";
+	    return 0;
         }
 	
 	if (fds[0].revents && POLLIN)
 	{
-		receivedBytes = recv(_socket, buffer, sizeOfBuffer - 1, 0);
+		receivedBytes = recv(_socket, _buffer, _sizeOfBuffer - 1, 0);
 	}
 	else
 	{
 		std::cerr << "Can't receive data from user : " << _socket << '\n';
-		delete [] buffer;
-		return "";
+		return 0;
 	}
 
 	if (receivedBytes < 0)
@@ -173,28 +219,17 @@ std::string User::get_information()
 		if (errno != EWOULDBLOCK && errno != EAGAIN)
 		{
 			std::cerr << "recv failed: " << strerror(errno) << std::endl;
-			delete [] buffer;
-			return "";
+			return 0;
 		}
-		delete [] buffer;
-		return "";
+		return 0;
 	}
 	else if (receivedBytes == 0)
 	{
 		std::cerr << "Client is unavailable.\n";
-		delete [] buffer;
-		return "";
+		return 0;
 	}
-
-	buffer[receivedBytes] = 0;
-	if (receivedBytes == 0)
-	{
-		delete [] buffer;
-		return "";
-	}
-	std::string result(buffer);
-	delete [] buffer;
-	return result;
+	
+	return receivedBytes;
 }
 
 // make ready.

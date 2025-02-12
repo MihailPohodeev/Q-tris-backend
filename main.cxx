@@ -213,7 +213,9 @@ void handle_new_users()
 				}
 				else if (command == "ConnectToRoom")
 				{
+					std::cout << "connection to room!\n";
 					std::lock_guard<std::mutex> lock(waitingRoomsGuard);
+					std::cout << "RoomID : " << responseJSON["Parameters"]["RoomID"];
 					int roomID = responseJSON["Parameters"]["RoomID"];
 					auto roomIT = waitingRooms.find(roomID);
 					json response;
@@ -222,6 +224,7 @@ void handle_new_users()
 					{
 						if (add_user_to_room(roomIT->second, *it))
 						{
+							std::cout << "connected!\n";
 							response["Status"] = "Successful";
 							it->send_information(response.dump());
 							it = users.erase(it);
@@ -275,7 +278,8 @@ void handle_game_processes()
 				++it;
 			}
 		}
-
+	
+		usleep(50);
 		for (auto it = processedRooms.begin(); it != processedRooms.end();)
 		{
 			if (!it->second)

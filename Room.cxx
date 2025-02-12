@@ -150,14 +150,17 @@ void Room::handle_process_room()
 					userData["ID"] = jt->get_socket();
 					userData["Username"] = jt->get_username();
 					response["Users"].push_back(userData);
-					it->send_information(response.dump());
 				}
+				it->send_information(response.dump());
 			}
 			else if (command == "GameFrame")
 			{
 				json data;
 				data["UserID"] = it->get_socket();
 				data["Data"] = requestJSON["Data"];
+				data["Score"] = requestJSON["Score"];
+				data["Level"] = requestJSON["Level"];
+				data["Lines"] = requestJSON["Lines"];
 				dataFrame["Data"].push_back(data);
 			}
 		}

@@ -12,7 +12,11 @@ class User
 	U64 _score;
 	U32 _lines;
 	U32 _level;
-
+	
+	// size of buffer for message receiving.
+	size_t _sizeOfBuffer;
+	// buffer for message receiving.
+	char* _buffer;
 	// is user ready to play?
 	bool _isReady;
 	// socket for communication with client, also ID.
@@ -28,10 +32,16 @@ public:
 	// send information to user.
 	void send_information(const std::string&);
 	// receive information.
-	std::string get_information();
+	size_t get_information();
 	// constructor.
 	// paramaters: socket, username.
 	User(int, const std::string&);
+	// destructor.
+	~User();
+	// copy constructor.
+	User(const User&);
+	// operator=
+	User operator=(User);
 	// get user's name.
 	std::string get_username() const;
 	// get socket.
