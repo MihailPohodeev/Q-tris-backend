@@ -12,13 +12,11 @@
 
 using json = nlohmann::json;
 
-
 std::vector<std::string> splitJson(const std::string&);
 
 User::User(int socket, const std::string& username) : _socket(socket), _username(username), _sizeOfBuffer(32000)
 {
-	size_t sizeOfBuffer = 16384;
-	_buffer = new char[sizeOfBuffer];
+	_buffer = new char[_sizeOfBuffer];
 }
 
 User::~User()
@@ -102,21 +100,17 @@ std::string User::dequeue_request()
 	if (_requestQueue.size() == 0)
 	{
 		size_t receivedBytes = get_information();
-		if (receivedBytes != 0)
+
+		if (receivedBytes > 0)
 		{
 			auto begin = _buffer;
-			auto end   = _buffer + receivedBytes - 1;
+			auto end   = _buffer + receivedBytes;
 			do
 			{
 				auto it = std::find_if(begin, end, [](char x) { return x == '\0';});
-				if (lastWord != "")
-				{
-					lastWord += std::string(begin);
-					_requestQueue.push(lastWord);
-					lastWord = "";
-				}
 				if (it == end)
 				{
+					*end = 0;
 					try
 					{
 						std::string result(begin);
@@ -125,13 +119,37 @@ std::string User::dequeue_request()
 					}
 					catch (const json::parse_error& e)
 					{
-						lastWord = std::string(begin);
+						if (lastWord != "")
+							lastWord += std::string(begin);
+						else
+							lastWord = std::string(begin);
 					}
 					break;
 				}
 				else
 				{
-					std::cout << "str : " << std::string(begin);
+					if (lastWord != "")
+					{
+						if (lastWord.size() > 16'000)
+						{
+							lastWord = "";
+							begin = it + 1;
+							continue;
+						}
+						lastWord += std::string(begin);
+						try
+						{
+							json::parse(lastWord);
+							_requestQueue.push(lastWord);
+							lastWord = "";
+						}
+						catch(const json::parse_error& e)
+						{
+							std::cerr << "Can't parse last word : " << e.what() << '\n';
+						}
+						begin = it + 1;
+						continue;
+					}
 					_requestQueue.push(std::string(begin));
 					begin = it + 1;
 				}
