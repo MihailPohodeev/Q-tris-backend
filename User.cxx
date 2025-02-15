@@ -98,42 +98,45 @@ bool User::try_identify()
 std::string User::dequeue_request()
 {
 	static std::string lastWord = "";
-	size_t receivedBytes = get_information();
 
-	if (receivedBytes != 0)
+	if (_requestQueue.size() == 0)
 	{
-		auto begin = _buffer;
-		auto end   = _buffer + receivedBytes - 1;
-		do
+		size_t receivedBytes = get_information();
+		if (receivedBytes != 0)
 		{
-			auto it = std::find_if(begin, end, [](char x) { return x == '\0';});
-			if (lastWord != "")
+			auto begin = _buffer;
+			auto end   = _buffer + receivedBytes - 1;
+			do
 			{
-				lastWord += std::string(begin);
-				_requestQueue.push(lastWord);
-				lastWord = "";
-			}
-			if (it == end)
-			{
-				try
+				auto it = std::find_if(begin, end, [](char x) { return x == '\0';});
+				if (lastWord != "")
 				{
-					std::string result(begin);
-					json::parse(result);
-					_requestQueue.push(result);
+					lastWord += std::string(begin);
+					_requestQueue.push(lastWord);
+					lastWord = "";
 				}
-				catch (const json::parse_error& e)
+				if (it == end)
 				{
-					lastWord = std::string(begin);
+					try
+					{
+						std::string result(begin);
+						json::parse(result);
+						_requestQueue.push(result);
+					}
+					catch (const json::parse_error& e)
+					{
+						lastWord = std::string(begin);
+					}
+					break;
 				}
-				break;
-			}
-			else
-			{
-				std::cout << "str : " << std::string(begin);
-				_requestQueue.push(std::string(begin));
-				begin = it + 1;
-			}
-		} while(1);
+				else
+				{
+					std::cout << "str : " << std::string(begin);
+					_requestQueue.push(std::string(begin));
+					begin = it + 1;
+				}
+			} while(1);
+		}
 	}
 
 	if (_requestQueue.size() == 0)
