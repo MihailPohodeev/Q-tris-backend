@@ -79,7 +79,7 @@ void Room::handle_waiting_room()
 		try
 		{
 			requestJSON = json::parse(request);
-			std::string command = requestJSON["Command"];
+			std::string command = requestJSON.at("Command");
 			if (command == "BeReady")
 			{
 				if (requestJSON["IsReady"] == "Yes")
@@ -136,7 +136,7 @@ void Room::handle_process_room()
 		try
 		{
 			requestJSON = json::parse(request);
-			std::string command = requestJSON["Command"];
+			std::string command = requestJSON.at("Command");
 			if (command == "GetRoomParameters")
 			{
 				json response;
@@ -157,11 +157,25 @@ void Room::handle_process_room()
 			{
 				json data;
 				data["UserID"] = it->get_socket();
-				data["Data"] = requestJSON["Data"];
-				data["Score"] = requestJSON["Score"];
-				data["Level"] = requestJSON["Level"];
-				data["Lines"] = requestJSON["Lines"];
+				data["Data"] = requestJSON.at("Data");
+				data["Score"] = requestJSON.at("Score");
+				data["Level"] = requestJSON.at("Level");
+				data["Lines"] = requestJSON.at("Lines");
+				data["NextFigure"] = requestJSON.at("NextFigure");
 				dataFrame["Data"].push_back(data);
+			}
+			else if (command == "GetNewFigures")
+			{
+				json data;
+				data["Command"] = "NewFigures";
+				data["Data"] = json::array();
+				for (U8 i = 0; i < 50; i++)
+					data["Data"].push_back((U32)(random() % 7));
+				std::cout << "Send new figures!\n";
+				for (auto it = _users.begin(); it != _users.end(); ++it)
+				{
+					it->send_information(data.dump());
+				}
 			}
 		}
 		catch(const json::parse_error& e)
