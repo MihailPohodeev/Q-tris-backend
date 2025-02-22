@@ -234,6 +234,25 @@ void handle_new_users()
 					response["Status"] = "Fail";
 					it->send_information(response.dump());
 				}
+				if (command == "GetRoomsList")
+				{
+					json response;
+					response["Command"] = "RoomsList";
+					response["Data"] = json::array();
+					std::lock_guard<std::mutex> lock(waitingRoomsGuard);
+					for (auto jt = waitingRooms.begin(); jt != waitingRooms.end();++jt)
+					{
+						if (jt->second)
+						{
+							json frame;
+							frame["ID"] = jt->second->get_ID();
+							frame["Capacity"] = jt->second->get_players_capacity();
+							frame["Count"] = jt->second->get_players_count();
+							response["Data"].push_back(frame);
+						}
+					}
+					it->send_information(response.dump());
+				}
 			}
 			catch(const json::parse_error& e)
 			{
